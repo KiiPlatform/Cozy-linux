@@ -13,13 +13,24 @@ console.log('cozy');
 console.log("Initializing Kii Cloud...");
 kii.Kii.initializeWithSite('bd4e2f16', '9552bad8c832d7e4aacdb3fefb20201f', kii.KiiSite.JP);
 
+// for edison
+console.log('Console parameter: ' + process.argv[2]);
+
 // For UDOO Neo
 function getCommand(ssid, bssid, passw, iface) {
     var cmd;
-    if(!passw)
-      cmd = 'nmcli dev wifi connect ' + ssid + ' iface ' + iface;
-    else
-      cmd = 'nmcli dev wifi connect ' + ssid + ' password ' + passw + ' iface ' + iface;
+    if(process.argv[2]=="edison"){
+      if(!passw)
+        cmd = 'configure_edison --changeWiFi OPEN ' + ssid ;
+      else
+        cmd = 'configure_edison --changeWiFi WPA-PSK ' + ssid +' ' + passw ;
+    }else{
+      if(!passw)
+        cmd = 'nmcli dev wifi connect ' + ssid + ' iface ' + iface;
+      else
+        cmd = 'nmcli dev wifi connect ' + ssid + ' password ' + passw + ' iface ' + iface;
+    }
+
     return cmd;
 }
 
