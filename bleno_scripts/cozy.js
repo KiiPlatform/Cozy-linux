@@ -1,40 +1,39 @@
 var util = require('util');
 var exec = require('child_process').exec;
-var bleno = require('./index');
+var bleno = require('../index');
 
 var BlenoPrimaryService = bleno.PrimaryService;
 var BlenoCharacteristic = bleno.Characteristic;
 var BlenoDescriptor = bleno.Descriptor;
 
-console.log('bleno');
+console.log('cozy');
 
-function startWifi(message) {
-    
-    var parsed;    
-    try {
-       parsed = JSON.parse(message);
-    }
-    catch(e){
-       console.log('Error parsing incoming message: ' + e);
-       return e;
-    }
-
-    var iface = 'wlan0';
-    var ssid = parsed.SSID; console.log('Got SSID: ' + ssid);
-    var bssid = parsed.BSSID; console.log('Got BSSID: ' + bssid);
-    var passw = parsed.password; console.log('Got password. Length: ' + passw.length);
+// For UDOO Neo
+function getCommand(ssid, bssid, passw, iface) {
     var cmd;
     if(!passw){
       cmd = 'nmcli dev wifi connect ' + ssid + ' iface ' + iface;
     }
     else{
       cmd = 'nmcli dev wifi connect ' + ssid + ' password ' + passw + ' iface ' + iface;
-    } 
-    console.log('Executing: ' + cmd);
-    exec(cmd, function(error, stdout, stderr) {
-      console.log(stdout + '. Error: ' + error);
-      return stdout;
-    });
+    }
+    return cmd;
+}
+
+function parseMessage(message) {
+    var parsed;
+    try {
+       parsed = JSON.parse(message);
+    }
+    catch(e){
+       console.log('Error parsing incoming message: ' + e);
+       return null;
+    }
+    return parsed;
+}
+
+function jsonLength(jsonMsg){
+  return Object.keys(jsonMsg).length;
 }
 
 var StaticReadOnlyCharacteristic = function() {
@@ -105,7 +104,13 @@ LongDynamicReadOnlyCharacteristic.prototype.onReadRequest = function(offset, cal
 var WriteOnlyCharacteristic = function() {
   WriteOnlyCharacteristic.super_.call(this, {
     uuid: '08590F7EDB05467E875772F6F66666D4',
-    properties: ['write', 'writeWithoutResponse']
+    properties: ['write', 'writeWithoutResponse', 'notify'],
+    descriptors: [
+      new BlenoDescriptor({
+        uuid: '2902',
+        value: 'Connect to wifi'
+      })
+    ]
   });
 };
 
@@ -113,9 +118,31 @@ util.inherits(WriteOnlyCharacteristic, BlenoCharacteristic);
 
 WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
   console.log('WriteOnlyCharacteristic write request: ' + data.toString() + ' ' + offset + ' ' + withoutResponse);
-  startWifi(data.toString());
-  //TODO if successful bring down bluetooth
-  callback(this.RESULT_SUCCESS);
+  
+  var jsonMsg = parseMessage(data);
+  if (offset) {
+    callback(this.RESULT_ATTR_NOT_LONG);
+  } else if (jsonLength(jsonMsg) !== 3) {
+    callback(this.RESULT_INVALID_ATTRIBUTE_LENGTH);
+  } else {
+    var iface = 'wlan0';
+    var ssid = jsonMsg.SSID; console.log('Got SSID: ' + ssid);
+    var bssid = jsonMsg.BSSID; console.log('Got BSSID: ' + bssid);
+    var passw = jsonMsg.password; console.log('Got password. Length: ' + passw.length);
+    var cmd = getCommand(ssid, bssid, passw, iface);
+    console.log('Executing: ' + cmd);
+    exec(cmd, function(error, stdout, stderr) {
+      console.log(stdout + '. Error: ' + error);
+      if (this.updateValueCallback) {
+        if(error)
+           this.updateValueCallback(new Buffer('-2'));
+        else
+           this.updateValueCallback(new Buffer('3'));
+      }
+    }.bind(this));
+    callback(this.RESULT_SUCCESS);
+  }
+
 };
 
 var NotifyOnlyCharacteristic = function() {
