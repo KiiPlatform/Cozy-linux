@@ -1,12 +1,17 @@
 var util = require('util');
 var exec = require('child_process').exec;
 var bleno = require('bleno');
+var jquery = require("node-jquery-xhr");
+var kii = require("./html5-cloud-sdk-v2.3.0").create();
 
 var BlenoPrimaryService = bleno.PrimaryService;
 var BlenoCharacteristic = bleno.Characteristic;
 var BlenoDescriptor = bleno.Descriptor;
 
 console.log('cozy');
+
+console.log("Initializing Kii Cloud...");
+kii.Kii.initializeWithSite('bd4e2f16', '9552bad8c832d7e4aacdb3fefb20201f', kii.KiiSite.JP);
 
 // For UDOO Neo
 function getCommand(ssid, bssid, passw, iface) {
