@@ -1,0 +1,18 @@
+{
+  "name": "edison_config",
+  "version": "1.2.1",
+  "description": ".properties wifi",
+  "keywords": [
+    "properties",
+    "config"
+  ],
+  "author": "Riza Alaudin Syah <riza.alaudin@kii.com>",
+  "engines": {
+    "node": ">=0.10"
+  },
+  "license": "MIT",
+  "main": "lib",
+  "dependencies": {
+    "properties": "^1.2.1"
+  }
+}
