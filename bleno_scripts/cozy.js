@@ -1,6 +1,8 @@
 var util = require('util');
 var exec = require('child_process').exec;
-var bleno = require('../index');
+var bleno = require('bleno');
+
+const CONNECTION_SUCCESSFUL = 'OK';
 
 var BlenoPrimaryService = bleno.PrimaryService;
 var BlenoCharacteristic = bleno.Characteristic;
@@ -11,12 +13,10 @@ console.log('cozy');
 // For UDOO Neo
 function getCommand(ssid, bssid, passw, iface) {
     var cmd;
-    if(!passw){
+    if(!passw)
       cmd = 'nmcli dev wifi connect ' + ssid + ' iface ' + iface;
-    }
-    else{
+    else
       cmd = 'nmcli dev wifi connect ' + ssid + ' password ' + passw + ' iface ' + iface;
-    }
     return cmd;
 }
 
@@ -36,93 +36,27 @@ function jsonLength(jsonMsg){
   return Object.keys(jsonMsg).length;
 }
 
-var StaticReadOnlyCharacteristic = function() {
-  StaticReadOnlyCharacteristic.super_.call(this, {
-    uuid: 'fffffffffffffffffffffffffffffff1',
-    properties: ['read'],
-    value: new Buffer('value'),
-    descriptors: [
-      new BlenoDescriptor({
-        uuid: '2901',
-        value: 'user description'
-      })
-    ]
-  });
-};
-util.inherits(StaticReadOnlyCharacteristic, BlenoCharacteristic);
-
-var DynamicReadOnlyCharacteristic = function() {
-  DynamicReadOnlyCharacteristic.super_.call(this, {
-    uuid: 'fffffffffffffffffffffffffffffff2',
-    properties: ['read']
-  });
-};
-
-util.inherits(DynamicReadOnlyCharacteristic, BlenoCharacteristic);
-
-DynamicReadOnlyCharacteristic.prototype.onReadRequest = function(offset, callback) {
-  var result = this.RESULT_SUCCESS;
-  var data = new Buffer('dynamic value');
-
-  if (offset > data.length) {
-    result = this.RESULT_INVALID_OFFSET;
-    data = null;
-  } else {
-    data = data.slice(offset);
-  }
-
-  callback(result, data);
-};
-
-var LongDynamicReadOnlyCharacteristic = function() {
-  LongDynamicReadOnlyCharacteristic.super_.call(this, {
-    uuid: 'fffffffffffffffffffffffffffffff3',
-    properties: ['read']
-  });
-};
-
-util.inherits(LongDynamicReadOnlyCharacteristic, BlenoCharacteristic);
-
-LongDynamicReadOnlyCharacteristic.prototype.onReadRequest = function(offset, callback) {
-  var result = this.RESULT_SUCCESS;
-  var data = new Buffer(512);
-
-  for (var i = 0; i < data.length; i++) {
-    data[i] = i % 256;
-  }
-
-  if (offset > data.length) {
-    result = this.RESULT_INVALID_OFFSET;
-    data = null;
-  } else {
-    data = data.slice(offset);
-  }
-
-  callback(result, data);
-};
-
-var WriteOnlyCharacteristic = function() {
-  WriteOnlyCharacteristic.super_.call(this, {
+var WifiConnectCharacteristic = function() {
+  WifiConnectCharacteristic.super_.call(this, {
     uuid: '08590F7EDB05467E875772F6F66666D4',
     properties: ['write', 'writeWithoutResponse', 'notify'],
     descriptors: [
       new BlenoDescriptor({
         uuid: '2902',
-        value: 'Connect to wifi'
+        value: 'Connect to wifi with incoming parameters'
       })
     ]
   });
 };
 
-util.inherits(WriteOnlyCharacteristic, BlenoCharacteristic);
+util.inherits(WifiConnectCharacteristic, BlenoCharacteristic);
 
-WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
-  console.log('WriteOnlyCharacteristic write request: ' + data.toString() + ' ' + offset + ' ' + withoutResponse);
-  
+WifiConnectCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
+  console.log('WifiConnectCharacteristic write request: ' + data.toString() + ' ' + offset + ' ' + withoutResponse);
   var jsonMsg = parseMessage(data);
   if (offset) {
     callback(this.RESULT_ATTR_NOT_LONG);
-  } else if (jsonLength(jsonMsg) !== 3) {
+  } else if (jsonLength(jsonMsg) !== 3) { // expecting 3 parameters
     callback(this.RESULT_INVALID_ATTRIBUTE_LENGTH);
   } else {
     var iface = 'wlan0';
@@ -132,101 +66,31 @@ WriteOnlyCharacteristic.prototype.onWriteRequest = function(data, offset, withou
     var cmd = getCommand(ssid, bssid, passw, iface);
     console.log('Executing: ' + cmd);
     exec(cmd, function(error, stdout, stderr) {
-      console.log(stdout + '. Error: ' + error);
+      if(error)
+        console.log('Error: ' + error);
+      else
+        console.log(CONNECTION_SUCCESSFUL);
       if (this.updateValueCallback) {
-        if(error)
-           this.updateValueCallback(new Buffer('-2'));
-        else
-           this.updateValueCallback(new Buffer('3'));
+        console.log('Setting command result in calback...');
+        if(error) {
+           this.updateValueCallback(new Buffer(error));
+           console.log('...sent: ' + error);
+        }
+        else {
+           this.updateValueCallback(new Buffer(CONNECTION_SUCCESSFUL));
+           console.log('...sent: ' + CONNECTION_SUCCESSFUL);
+        }
       }
     }.bind(this));
     callback(this.RESULT_SUCCESS);
   }
-
-};
-
-var NotifyOnlyCharacteristic = function() {
-  NotifyOnlyCharacteristic.super_.call(this, {
-    uuid: 'fffffffffffffffffffffffffffffff5',
-    properties: ['notify']
-  });
-};
-
-util.inherits(NotifyOnlyCharacteristic, BlenoCharacteristic);
-
-NotifyOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
-  console.log('NotifyOnlyCharacteristic subscribe');
-
-  this.counter = 0;
-  this.changeInterval = setInterval(function() {
-    var data = new Buffer(4);
-    data.writeUInt32LE(this.counter, 0);
-
-    console.log('NotifyOnlyCharacteristic update value: ' + this.counter);
-    updateValueCallback(data);
-    this.counter++;
-  }.bind(this), 5000);
-};
-
-NotifyOnlyCharacteristic.prototype.onUnsubscribe = function() {
-  console.log('NotifyOnlyCharacteristic unsubscribe');
-
-  if (this.changeInterval) {
-    clearInterval(this.changeInterval);
-    this.changeInterval = null;
-  }
-};
-
-NotifyOnlyCharacteristic.prototype.onNotify = function() {
-  console.log('NotifyOnlyCharacteristic on notify');
-};
-
-var IndicateOnlyCharacteristic = function() {
-  IndicateOnlyCharacteristic.super_.call(this, {
-    uuid: 'fffffffffffffffffffffffffffffff6',
-    properties: ['indicate']
-  });
-};
-
-util.inherits(IndicateOnlyCharacteristic, BlenoCharacteristic);
-
-IndicateOnlyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
-  console.log('IndicateOnlyCharacteristic subscribe');
-
-  this.counter = 0;
-  this.changeInterval = setInterval(function() {
-    var data = new Buffer(4);
-    data.writeUInt32LE(this.counter, 0);
-
-    console.log('IndicateOnlyCharacteristic update value: ' + this.counter);
-    updateValueCallback(data);
-    this.counter++;
-  }.bind(this), 1000);
-};
-
-IndicateOnlyCharacteristic.prototype.onUnsubscribe = function() {
-  console.log('IndicateOnlyCharacteristic unsubscribe');
-
-  if (this.changeInterval) {
-    clearInterval(this.changeInterval);
-    this.changeInterval = null;
-  }
-};
-
-IndicateOnlyCharacteristic.prototype.onIndicate = function() {
-  console.log('IndicateOnlyCharacteristic on indicate');
 };
 
 function CozyService() {
   CozyService.super_.call(this, {
     uuid: 'E20A39F473F54BC4A12F17D1AD666661',
     characteristics: [
-      //new StaticReadOnlyCharacteristic(),
-      //new DynamicReadOnlyCharacteristic(),
-      //new LongDynamicReadOnlyCharacteristic(),
-      new WriteOnlyCharacteristic()//,
-      //new NotifyOnlyCharacteristic(),
-      //new IndicateOnlyCharacteristic()
+      new WifiConnectCharacteristic()
     ]
   });
 }
