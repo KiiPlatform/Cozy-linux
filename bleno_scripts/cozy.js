@@ -10,7 +10,7 @@ var BlenoDescriptor = bleno.Descriptor;
 
 console.log('cozy');
 // for edison
-
+console.log(process.argv[2]);
 // For UDOO Neo
 function getCommand(ssid, bssid, passw, iface) {
     var cmd;
