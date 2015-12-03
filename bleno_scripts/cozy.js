@@ -2,8 +2,6 @@ var util = require('util');
 var exec = require('child_process').exec;
 var bleno = require('bleno');
 
-const CONNECTION_SUCCESSFUL = 'OK';
-
 var BlenoPrimaryService = bleno.PrimaryService;
 var BlenoCharacteristic = bleno.Characteristic;
 var BlenoDescriptor = bleno.Descriptor;
@@ -52,11 +50,12 @@ var WifiConnectCharacteristic = function() {
 util.inherits(WifiConnectCharacteristic, BlenoCharacteristic);
 
 WifiConnectCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
+  console.log('WifiConnectCharacteristic data size is: ' + data.length);
   console.log('WifiConnectCharacteristic write request: ' + data.toString() + ' ' + offset + ' ' + withoutResponse);
   var jsonMsg = parseMessage(data);
   if (offset) {
     callback(this.RESULT_ATTR_NOT_LONG);
-  } else if (jsonLength(jsonMsg) !== 3) { // expecting 3 parameters
+  } else if (jsonMsg == null || (jsonLength(jsonMsg) !== 3)) { // expecting 3 parameters
     callback(this.RESULT_INVALID_ATTRIBUTE_LENGTH);
   } else {
     var iface = 'wlan0';
@@ -69,16 +68,18 @@ WifiConnectCharacteristic.prototype.onWriteRequest = function(data, offset, with
       if(error)
         console.log('Error: ' + error);
       else
-        console.log(CONNECTION_SUCCESSFUL);
+        console.log('Success!');
       if (this.updateValueCallback) {
         console.log('Setting command result in calback...');
         if(error) {
-           this.updateValueCallback(new Buffer(error));
-           console.log('...sent: ' + error);
+           var errorMsg = '-1';
+           this.updateValueCallback(new Buffer(errorMsg));
+           console.log('...sent: ' + errorMsg);
         }
         else {
-           this.updateValueCallback(new Buffer(CONNECTION_SUCCESSFUL));
-           console.log('...sent: ' + CONNECTION_SUCCESSFUL);
+           var successMsg = '74:da:ea:98:4b:04'; //device id
+           this.updateValueCallback(new Buffer(successMsg));
+           console.log('...sent: ' + successMsg);
         }
       }
     }.bind(this));
