@@ -1,5 +1,5 @@
 # Cozy-linux
-Cozy SDK for Linux embedded
+Cozy SDK for embedded Linux
 
 IoT devices usually require an Internet connection but most don't have a proper input/display (eg. a drone).
 Cozy aims to solve this problem by providing an easy way to pass wifi credentials securely by using a smartphone as a configurator.
