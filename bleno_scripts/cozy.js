@@ -9,14 +9,23 @@ var BlenoCharacteristic = bleno.Characteristic;
 var BlenoDescriptor = bleno.Descriptor;
 
 console.log('cozy');
+// for edison
 
 // For UDOO Neo
 function getCommand(ssid, bssid, passw, iface) {
     var cmd;
-    if(!passw)
-      cmd = 'nmcli dev wifi connect ' + ssid + ' iface ' + iface;
-    else
-      cmd = 'nmcli dev wifi connect ' + ssid + ' password ' + passw + ' iface ' + iface;
+    if(process.argv[2]=="edison"){
+      if(!passw)
+        cmd = 'configure_edison --changeWiFi OPEN ' + ssid ;
+      else
+        cmd = 'configure_edison --changeWiFi WPA-PSK ' + ssid +' ' + passw ;
+    }else{
+      if(!passw)
+        cmd = 'nmcli dev wifi connect ' + ssid + ' iface ' + iface;
+      else
+        cmd = 'nmcli dev wifi connect ' + ssid + ' password ' + passw + ' iface ' + iface;
+    }
+
     return cmd;
 }
 
